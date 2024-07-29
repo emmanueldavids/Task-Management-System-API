@@ -22,7 +22,7 @@ class UserOut(BaseModel):
     username: str
     email: str
 
-# In-memory user database (replace with a real database)
+# will replace with a real database
 users = []
 
 # OAuth2 password bearer
