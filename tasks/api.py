@@ -59,7 +59,7 @@ async def update_task(task_id: int, task: Task):
             return task
     raise HTTPException(status_code=404, detail="Task not found")
 
-# Delete task
+# to Delete tasks by id
 @task_router.delete("/{task_id}")
 async def delete_task(task_id: int):
     for i, t in enumerate(tasks):
@@ -68,7 +68,7 @@ async def delete_task(task_id: int):
             return {"message": "Task deleted"}
     raise HTTPException(status_code=404, detail="Task not found")
 
-# Assign task to user
+# Assign task to user using user_id
 @task_router.post("/{task_id}/assign")
 async def assign_task(task_id: int, user_id: int):
     task = next((task for task in tasks if task.id == task_id), None)
@@ -77,7 +77,7 @@ async def assign_task(task_id: int, user_id: int):
     task.assigned_to = user_id
     return task
 
-# Get tasks assigned to a user
+# will Get tasks assigned to a user
 @task_router.get("/user", response_model=List[Task])
 async def get_user_tasks(user_id: int):
     user_tasks = [task for task in tasks if task.assigned_to == user_id]
@@ -85,7 +85,7 @@ async def get_user_tasks(user_id: int):
         raise HTTPException(status_code=404, detail="No tasks found for the specified user")
     return user_tasks
 
-#Get all task assigned to a user
+#will Get all task assigned to a user
 @task_router.get("/", response_model=List[Task])
 async def get_all_tasks():
     return tasks
