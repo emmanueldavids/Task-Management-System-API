@@ -33,10 +33,7 @@ class TaskIn(BaseModel):
     user_id: int
 
 
-
-# tasks.status = TaskStatus.COMPLETED
-
-# TASK API
+#----------START TASK API---------------
 # Create task
 @task_router.post("/", response_model=Task)
 async def create_task(task: Task):
