@@ -4,7 +4,7 @@ Overview
 
 This project is a RESTful API for managing tasks. It allows signup, Login and also allows users to create, read, update, and delete tasks.
 
-Features
+## Features
 - Signup/Login 
 - Create new tasks
 - Retrieve a list of all tasks
@@ -14,7 +14,7 @@ Features
 - Assign task to a user
   
 
-Endpoints
+## Endpoints
 - GET / : Retrieve users
 - POST /: Create a new user
 - GET /tasks: Retrieve a list of all tasks
@@ -25,14 +25,14 @@ Endpoints
 - POST /{task_id}/assign: Assign task to a user
 
 
-Requirements
+## Requirements
 
 - Python 3.8+
 - FastAPI
 - Pydantic
 
 
-Setup
+## Setup
 
 1. Clone the repository
 2. Install dependencies: pip install -r requirements.txt
@@ -40,6 +40,6 @@ Setup
 4. Run the API: uvicorn main:app --reload => For Linux
 
 
-Contributing
+### Contributing
 
 Contributions are welcome! Please submit a pull request with your changes.
