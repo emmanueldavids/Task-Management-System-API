@@ -23,3 +23,4 @@ class Tasks(Base):
     status = Column(String(50))
     assigned_to = Column(Integer)
     user_id = Column(Integer)
+    
