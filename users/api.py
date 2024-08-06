@@ -74,8 +74,9 @@ async def update_user(user_id: int, user: UserBase, db: db_dependency):
     if update_user is None:
         raise HTTPException(status_code=404, detail='User Not Found')
     
-    update_user.title = user.title
-    update_user.description = user.description
+    update_user.password = user.password
+    update_user.email = user.email
+    update_user.username = user.username
     
     db.commit()
     return update_user

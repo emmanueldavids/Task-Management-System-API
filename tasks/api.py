@@ -92,7 +92,7 @@ async def update_task(task_id: int, task: TasksBase, db: db_dependency):
 async def get_task(task_id: int, db: db_dependency):
     task = db.query(models.Tasks).filter(models.Tasks.id == task_id).first()
     if task is None:
-        raise HTTPException(status_code=404, detail='Task Not Found')
+        raise HTTPException(status_code=404, detail='User Not Found')
     db.delete(task)
     db.commit()
     return "Task Deleted Successfull"
