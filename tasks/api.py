@@ -1,15 +1,18 @@
 from enum import Enum
-from fastapi import APIRouter, HTTPException
+from msilib import schema
+from fastapi import APIRouter, HTTPException, Response, Request, Depends,status
 from pydantic import BaseModel
-from typing import List
+from typing import List, Annotated
 import datetime
-import smtplib
-from email.mime.text import MIMEText
-from users.api import users
+import models
+from database import engine, SessionLocal
+from sqlalchemy.orm import Session
 
 task_router = APIRouter()
+models.Base.metadata.create_all(bind=engine)
 
-tasks = []
+
+
 
 class TaskStatus(Enum):
     PENDING = "pending"
@@ -17,8 +20,7 @@ class TaskStatus(Enum):
     COMPLETED = "completed"
 
 # Pydantic models
-class Task(BaseModel):
-    id: int
+class TasksBase(BaseModel):
     title: str
     description: str
     dueDate: datetime.date
@@ -26,58 +28,74 @@ class Task(BaseModel):
     assigned_to: int
     user_id: int
 
-class TaskIn(BaseModel):
-    title: str
-    description: str
-    dueDate: datetime.datetime
-    user_id: int
+#dependency for the database
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency = Annotated[Session, Depends(get_db)]
 
 
 #----------START TASK API---------------
 # Create task
-@task_router.post("/", response_model=Task)
-async def create_task(task: Task):
-    tasks.append(task)
-    return task
+@task_router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_task(task: TasksBase, db: db_dependency):
+    db_task = models.Tasks(**task.dict())
+    db.add(db_task)
+    db.commit()
+    return db
 
 # List all tasks
-@task_router.get("/", response_model=List[Task])
-async def read_tasks():
+@task_router.get('/', status_code=status.HTTP_200_OK)
+async def get_user(db: db_dependency):
+    tasks = db.query(models.Tasks).all()
+    if tasks is None:
+        raise HTTPException(status_code=404, detail='User Not Found')
     return tasks
 
+
 # Get task by ID
-@task_router.get("/{task_id}", response_model=Task)
-async def read_task(task_id: int):
-    task = next((task for task in tasks if task.id == task_id), None)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return task
+@task_router.get('/{tasks_id}', status_code=status.HTTP_200_OK)
+async def get_user(tasks_id: int,db: db_dependency):
+    tasks = db.query(models.Tasks).filter(models.Tasks.id == tasks_id).first()
+    if tasks is None:
+        raise HTTPException(status_code=404, detail='User Not Found')
+    return tasks
 
 # Get task by due date
-@task_router.get("/due_date/{task_due_date}", response_model=List[Task])
-async def read_task_by_due_date(task_due_date: datetime.date):
-    filtered_tasks = [task for task in tasks if task.dueDate == task_due_date]
+@task_router.get("/due_date/{task_due_date}", status_code=status.HTTP_200_OK)
+async def task_due_date(tasks_due_date: datetime.date, db: db_dependency):
+    filtered_tasks = db.query(models.Tasks).filter(models.Tasks.id == tasks_due_date).first()
     if not filtered_tasks:
-        raise HTTPException(status_code=404, detail="No tasks found for the specified due date")
+        raise HTTPException(status_code=404, detail="No Due Date found for the specified due date")
     return filtered_tasks
 
 # Update task
-@task_router.put("/{task_id}", response_model=Task)
-async def update_task(task_id: int, task: Task):
-    for i, t in enumerate(tasks):
-        if t.id == task_id:
-            tasks[i] = task
-            return task
-    raise HTTPException(status_code=404, detail="Task not found")
+@task_router.put('/{task_id}', status_code=status.HTTP_200_OK)
+async def update_task(task_id: int, task: TasksBase, db: db_dependency):
+    update_task = db.query(models.Tasks).filter((models.Tasks.id) == task_id).first()
+    if update_task is None:
+        raise HTTPException(status_code=404, detail='Task Not Found')
+    
+    update_task.title = task.title
+    update_task.description = task.description
+    
+    db.commit()
+    return update_task
+
 
 # to Delete tasks by id
-@task_router.delete("/{task_id}")
-async def delete_task(task_id: int):
-    for i, t in enumerate(tasks):
-        if t.id == task_id:
-            del tasks[i]
-            return {"message": "Task deleted"}
-    raise HTTPException(status_code=404, detail="Task not found")
+@task_router.delete('/{task_id}', status_code=status.HTTP_200_OK)
+async def get_task(task_id: int, db: db_dependency):
+    task = db.query(models.Tasks).filter(models.Tasks.id == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail='Task Not Found')
+    db.delete(task)
+    db.commit()
+    return "Task Deleted Successfull"
 
 #------------------END OF TASK API------------------------------------------
 
@@ -110,14 +128,31 @@ async def delete_task(task_id: int):
 #     server.quit()
 
 # Assign task to user using user_id
-@task_router.post("/{task_id}/assign")
-async def assign_task(task_id: int, user_id: int):
-    task = next((task for task in tasks if task.id == task_id), None)
+@task_router.post("/{task_id}/assign", status_code=status.HTTP_201_CREATED)
+async def assign_task(task_id: int, user_id: int, db: db_dependency):
+    task = db.query(models.Tasks).filter((models.Tasks.id) == task_id).first()
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
     task.assigned_to = user_id
+    db.commit()
     # send_notification(user_id, f"Task Assigned: {task.title}")
     return task
+
+@task_router.get("/{task_id}", status_code=status.HTTP_200_OK)
+async def get_assigned_task(task_id: int, db: db_dependency):
+    task = db.query(models.Tasks).filter((models.Tasks) == task_id).first()
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    # Print task details
+    print(f"User ID: {task.assigned_to}")
+    print(f"Task Title: {task.title}")
+    print(f"Task Description: {task.description}")
+    print(f"Due Date: {task.due_date}")
+    
+    return task
+
+
 
 # Send reminder to user
 # async def send_due_date_reminder(task: Task):
@@ -127,17 +162,6 @@ async def assign_task(task_id: int, user_id: int):
 # for task in tasks:
 #     if task.due_date - datetime.now() <= datetime.timedelta(days=1):
 #         send_due_date_reminder(task)
-
-
-
-# will Get tasks assigned to a user
-@task_router.get("/user", response_model=List[Task])
-async def get_user_tasks(user_id: int):
-    user_tasks = [task for task in tasks if task.assigned_to == user_id]
-    if not user_tasks:
-        raise HTTPException(status_code=404, detail="No tasks found for the specified user")
-    return user_tasks
-
 
 
 # #post completed task
