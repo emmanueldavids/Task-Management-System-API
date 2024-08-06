@@ -13,6 +13,6 @@ app = FastAPI(
 
 template = Jinja2Templates(directory="templates")
 
-app.include_router(user_router, prefix="/users", tags=["users"])
-app.include_router(task_router, prefix="/tasks", tags=["tasks"])
+app.include_router(user_router, prefix="/users", tags=["Users"])
+app.include_router(task_router, prefix="/tasks", tags=["Tasks"])
 
