@@ -1,57 +1,92 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Response, Request, Depends, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from pydantic import BaseModel
-from typing import List
+import models
+from typing import List, Annotated
+from database import engine, SessionLocal
+from sqlalchemy.orm import Session
 
 user_router = APIRouter()
+models.Base.metadata.create_all(bind=engine)
 
 # Pydantic models
-class User(BaseModel):
-    id: int
+class UserBase(BaseModel):
     username: str
     email: str
     password: str
 
-class UserIn(BaseModel):
-    username: str
-    email: str
-    password: str
+# class UserInBase(BaseModel):
+#     username: str
+#     email: str
+#     password: str
 
-class UserOut(BaseModel):
-    id: int
-    username: str
-    email: str
+# class UserOutBase(BaseModel):
+#     id: int
+#     username: str
+#     email: str
 
-# will replace with a real database
-users = []
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+db_dependency = Annotated[Session, Depends(get_db)]
+
 
 # OAuth2 password bearer
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-# Create user
-@user_router.post("/", response_model=UserOut)
-async def create_user(user: UserIn):
-    new_user = User(id=len(users) + 1, username=user.username, email=user.email, password=user.password)
-    users.append(new_user)
+#Post user (Create User)
+@user_router.post("/", status_code=status.HTTP_201_CREATED)
+async def create_user(user: UserBase, db: db_dependency):
+    new_user = models.User(username=user.username, email=user.email, password=user.password)
+    db.add(new_user)
+    db.commit()
     return new_user
 
-# List all users
-@user_router.get("/", response_model=List[UserOut])
-async def read_users():
+#Get all user
+@user_router.get("/", status_code=status.HTTP_200_OK)
+async def read_users(db: db_dependency):
+    users = db.query(models.User).all()
     return users
 
-# Get user by ID
-@user_router.get("/{user_id}", response_model=UserOut)
-async def read_user(user_id: int):
-    user = next((user for user in users if user.id == user_id), None)
+#Get user by id
+@user_router.get("/{user_id}", status_code=status.HTTP_200_OK)
+async def read_user(user_id: int, db: db_dependency):
+    user = db.query(models.User).filter((models.User.id) == user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-# Token endpoint
-@user_router.post("/token")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = next((user for user in users if user.username == form_data.username), None)
+# Post Users Login
+@user_router.post("/token", status_code=status.HTTP_201_CREATED)
+async def login( db: db_dependency, form_data: OAuth2PasswordRequestForm = Depends()):
+    user = db.query(models.User).filter(models.User.username == form_data.username).first()
     if not user or user.password != form_data.password:
         raise HTTPException(status_code=401, detail="Invalid username or password")
     return {"access_token": user.username, "token_type": "bearer"}
+
+# Update User
+@user_router.put('/{user_id}', status_code=status.HTTP_200_OK)
+async def update_user(user_id: int, user: UserBase, db: db_dependency):
+    update_user = db.query(models.User).filter((models.User.id) == user_id).first()
+    if update_user is None:
+        raise HTTPException(status_code=404, detail='User Not Found')
+    
+    update_user.title = user.title
+    update_user.description = user.description
+    
+    db.commit()
+    return update_user
+
+# to Delete Users by id
+@user_router.delete('/{user_id}', status_code=status.HTTP_200_OK)
+async def get_user(user_id: int, db: db_dependency):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail='User Not Found')
+    db.delete(user)
+    db.commit()
+    return "User Deleted Successfull"
+
